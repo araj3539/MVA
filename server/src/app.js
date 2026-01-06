@@ -1,11 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 
-// Import the routes
+// Import Routes
 const voiceRoutes = require("./routes/voice.routes");
-const appointmentRoutes = require("./routes/appointment.routes"); // Add this
-const doctorRoutes = require("./routes/doctor.routes");         // Add this
-// const authRoutes = require("./routes/auth.routes");          // Uncomment if you use auth routes
+const assemblyRoutes = require("./routes/assembly.routes"); // <--- Import this
+// Ensure these exist if you are using them, otherwise comment them out:
+const appointmentRoutes = require("./routes/appointment.routes");
+const doctorRoutes = require("./routes/doctor.routes");
 
 const app = express();
 
@@ -16,10 +17,10 @@ app.use(cors({
 
 app.use(express.json());
 
-// Mount the routes
+// Mount Routes
 app.use("/api/voice", voiceRoutes);
-app.use("/api/appointments", appointmentRoutes); // Add this
-app.use("/api/doctors", doctorRoutes);           // Add this
-// app.use("/api/auth", authRoutes);             // Uncomment if using auth
+app.use("/api/assembly", assemblyRoutes); // <--- Mount this
+app.use("/api/appointments", appointmentRoutes);
+app.use("/api/doctors", doctorRoutes);
 
 module.exports = app;

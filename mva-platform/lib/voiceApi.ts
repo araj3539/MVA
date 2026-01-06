@@ -1,19 +1,16 @@
-import { useAuth } from "@clerk/nextjs";
+// REMOVED: import { useAuth } from "@clerk/nextjs"; 
 
 type AIResponse = {
   aiText: string;
   escalate?: boolean;
 };
 
-export async function sendTextToAI(text: string): Promise<AIResponse> {
-  const { getToken } = useAuth();
-  const token = await getToken();
-
+// FIX: Accept 'token' as an argument
+export async function sendTextToAI(text: string, token: string): Promise<AIResponse> {
   if (!token) {
     throw new Error("User not authenticated");
   }
 
-  // Use the correct API URL (use env var in production)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
   const res = await fetch(
@@ -22,7 +19,7 @@ export async function sendTextToAI(text: string): Promise<AIResponse> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}` // Use the passed token
       },
       body: JSON.stringify({ text })
     }
