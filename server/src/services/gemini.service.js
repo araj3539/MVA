@@ -13,6 +13,9 @@ Rules:
 - Do NOT prescribe medicines
 - Provide only general health guidance
 - Always advise consulting a licensed doctor if symptoms persist
+- Keep responses concise (max 100 words)
+
+Provide a helpful and accurate response based on the user's input below.
 
 User says: "${userText}"
 `;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import DoctorCard from "@/components/DoctorCard";
 import { useRouter } from "next/navigation";
 import StreamingMicButton from "@/components/StreamingMicButton";
@@ -10,22 +10,26 @@ type Doctor = {
   _id: string;
   name: string;
   specialization: string;
-  // Add other fields if needed
+  experience?: number;
 };
 
 type Message = {
   text: string;
   sender: "user" | "ai";
+  timestamp: Date;
 };
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  // NEW: State to hold the text while you are speaking
+  const [streamingText, setStreamingText] = useState(""); 
   const [showDoctorCTA, setShowDoctorCTA] = useState(false);
   const router = useRouter();
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch doctors from backend
+    // Fetch doctors
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     fetch(`${apiUrl}/api/appointments/doctors`)
       .then((res) => {
@@ -38,61 +42,118 @@ export default function DoctorsPage() {
       .catch((err) => console.error("Error loading doctors:", err));
     
     // Initial greeting
-    setMessages([{ text: "Hello! I am your medical AI assistant. How can I help you today?", sender: "ai" }]);
+    setMessages([{ 
+      text: "Hello! I am your medical AI assistant. Describe your symptoms, and I can help you.", 
+      sender: "ai",
+      timestamp: new Date()
+    }]);
   }, []);
 
+  // Auto-scroll to bottom of chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingText]);
+
   const addMessage = (text: string, sender: "user" | "ai") => {
-    setMessages((prev) => [...prev, { text, sender }]);
+    setMessages((prev) => [...prev, { text, sender, timestamp: new Date() }]);
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
+    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10">
+      
       {/* --- AI Section --- */}
-      <section className="flex flex-col items-center gap-6 p-8 bg-gradient-to-br from-blue-50 to-white rounded-3xl shadow-lg border border-blue-100">
-        <h1 className="text-3xl font-bold text-gray-800">AI Medical Assistant</h1>
+      <section className="flex flex-col items-center gap-8 p-8 bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
         
-        {/* Chat Log */}
-        <div className="w-full max-w-2xl h-64 overflow-y-auto bg-white rounded-xl p-4 shadow-inner border border-gray-100 flex flex-col gap-3">
+        <div className="text-center space-y-2">
+           <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
+             AI Health Assistant
+           </h1>
+           <p className="text-gray-500">Powered by AssemblyAI & Gemini</p>
+        </div>
+        
+        {/* Chat Interface */}
+        <div className="w-full max-w-3xl h-[400px] overflow-y-auto bg-gray-50 rounded-2xl p-6 shadow-inner border border-gray-200 flex flex-col gap-4">
           {messages.map((msg, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`p-3 rounded-lg max-w-[80%] text-sm ${
-                msg.sender === "user"
-                  ? "bg-blue-600 text-white self-end rounded-br-none"
-                  : "bg-gray-100 text-gray-800 self-start rounded-bl-none"
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className={`flex flex-col max-w-[80%] ${
+                msg.sender === "user" ? "self-end items-end" : "self-start items-start"
               }`}
             >
-              <strong>{msg.sender === "ai" ? "🤖 AI" : "👤 You"}:</strong> {msg.text}
+              <div
+                className={`px-5 py-3 rounded-2xl text-md leading-relaxed shadow-sm ${
+                  msg.sender === "user"
+                    ? "bg-blue-600 text-white rounded-br-none"
+                    : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
+                }`}
+              >
+                {msg.text}
+              </div>
+              <span className="text-[10px] text-gray-400 mt-1 px-1">
+                {msg.sender === "ai" ? "AI Assistant" : "You"} • {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </span>
             </motion.div>
           ))}
+
+          {/* --- STREAMING BUBBLE (The "Ghost" Text) --- */}
+          {streamingText && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col max-w-[80%] self-end items-end"
+            >
+              <div className="px-5 py-3 rounded-2xl rounded-br-none bg-blue-100 text-blue-800 border border-blue-200 shadow-sm animate-pulse">
+                {streamingText}
+                <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-blink align-middle" />
+              </div>
+              <span className="text-[10px] text-blue-400 mt-1 px-1">Listening...</span>
+            </motion.div>
+          )}
+          
+          <div ref={chatEndRef} />
         </div>
 
-        {/* Mic Button */}
+        {/* Mic Control */}
         <StreamingMicButton 
           addMessage={addMessage} 
+          onPartial={(text) => setStreamingText(text)} 
           setShowDoctorCTA={setShowDoctorCTA} 
         />
       </section>
 
-      {/* --- Doctor Recommendation Section --- */}
+      {/* --- Doctor Recommendation (Pop-up) --- */}
       <AnimatePresence>
         {showDoctorCTA && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md"
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-lg shadow-sm"
           >
-            <p className="text-yellow-700 font-medium">
-              ⚠️ Based on your symptoms, we recommend consulting a specialist immediately.
-            </p>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h3 className="font-bold text-amber-800">Medical Attention Recommended</h3>
+                <p className="text-amber-700 text-sm">
+                  Based on your symptoms, we suggest consulting a specialist. Please choose a doctor below.
+                </p>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <section>
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">Available Doctors</h2>
+        <div className="flex items-center justify-between mb-6">
+           <h2 className="text-2xl font-bold text-gray-800">Available Doctors</h2>
+           <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+             {doctors.length} Specialists
+           </span>
+        </div>
+        
         {doctors.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {doctors.map((doc) => (
@@ -104,7 +165,9 @@ export default function DoctorsPage() {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-10">No doctors available at the moment.</p>
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+             <p>No doctors available at the moment.</p>
+          </div>
         )}
       </section>
     </div>

@@ -9,14 +9,13 @@ export function useAssemblyAI(
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   
-  // Store the full conversation for this session (optional history)
+  // Buffers
   const sessionTranscript = useRef("");
-  // Store the text of the CURRENT turn (while speaking)
   const currentTurnText = useRef("");
 
-  // Helper to Stop Recording & Send Message
+  // Helper to Stop & Send
   const stop = () => {
-    // 1. Stop Audio Processing
+    // 1. Stop Audio
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -26,7 +25,7 @@ export function useAssemblyAI(
       audioContextRef.current = null;
     }
     
-    // 2. Close WebSocket
+    // 2. Close Socket
     if (socketRef.current) {
       if (socketRef.current.readyState === WebSocket.OPEN) {
           socketRef.current.send(JSON.stringify({ type: "Terminate" }));
@@ -37,14 +36,13 @@ export function useAssemblyAI(
     
     setIsRecording(false);
 
-    // 3. AUTO-SEND: Finalize & Send Text to AI
+    // 3. Finalize Text & Send
     const finalText = (sessionTranscript.current + " " + currentTurnText.current).trim();
-    
     if (finalText) {
       onFinalTranscript(finalText);
     }
 
-    // 4. Reset Buffers
+    // 4. Reset
     sessionTranscript.current = "";
     currentTurnText.current = "";
   };
@@ -58,7 +56,7 @@ export function useAssemblyAI(
       
       const { token } = await tokenRes.json();
 
-      // USE EU ENDPOINT (Bypasses US Network Block)
+      // Connect to EU Endpoint
       const socket = new WebSocket(
         `wss://streaming.eu.assemblyai.com/v3/ws?sample_rate=16000&token=${token}`
       );
@@ -67,20 +65,17 @@ export function useAssemblyAI(
       socket.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
 
-        // Handle V3 "Turn" Events
         if (data.type === 'Turn') {
-           // FIX 1: NO STUTTERING
-           // We overwrite ( = ) instead of appending ( += ) because V3 sends the full sentence.
+           // FIX: Overwrite text to prevent "i i have i have" stuttering
            if (data.transcript) {
              currentTurnText.current = data.transcript;
            }
 
-           // Show partial text to user while speaking
+           // Update the "Ghost Bubble" in UI
            const fullDisplay = (sessionTranscript.current + " " + currentTurnText.current).trim();
            onPartial?.(fullDisplay);
 
-           // FIX 2: AUTO-SEND
-           // When AssemblyAI detects the end of a sentence/turn, we stop and send.
+           // Auto-Send on Silence
            if (data.end_of_turn) {
              stop(); 
            }
@@ -114,10 +109,6 @@ export function useAssemblyAI(
         console.error("WebSocket Error:", err);
         setIsRecording(false);
       };
-      
-      socket.onclose = () => {
-        setIsRecording(false);
-      }
 
     } catch (err) {
       console.error(err);
@@ -129,7 +120,6 @@ export function useAssemblyAI(
   return { start, stop, isRecording };
 }
 
-// Helper to convert audio format
 function convertFloat32ToInt16(buffer: Float32Array) {
   const pcm = new ArrayBuffer(buffer.length * 2);
   const view = new DataView(pcm);
