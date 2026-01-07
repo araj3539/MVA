@@ -1,23 +1,31 @@
 const genAI = require("../config/gemini");
 
-exports.getGeminiResponse = async (userText) => {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash"
-  });
+exports.getGeminiResponse = async (userText, history, doctorList) => {
+  // Use 'gemini-1.5-flash' for high rate limits
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `
-You are a medical information assistant.
+You are an advanced Medical AI Assistant for the MVA Platform.
 
-Rules:
-- Do NOT diagnose diseases
-- Do NOT prescribe medicines
-- Provide only general health guidance
-- Always advise consulting a licensed doctor if symptoms persist
-- Keep responses concise (max 100 words)
+### CONTEXT:
+${history || "No previous context."}
 
-Provide a helpful and accurate response based on the user's input below.
+### AVAILABLE DOCTORS:
+${doctorList || "No doctors available."}
 
-User says: "${userText}"
+### USER INPUT:
+"${userText}"
+
+### INSTRUCTIONS:
+1. **Analyze Symptoms:** Provide brief, empathetic guidance.
+2. **Recommend Doctors:** If a specific doctor from the list matches the symptoms, you MUST recommend them.
+3. **CRITICAL FORMAT:** If you recommend a doctor, you must append their exact ID at the end of the response in this format: [REC:DOCTOR_ID].
+   - Example response: "Based on your heart pain, Dr. Sarah Smith is a great choice. [REC:user_doc_cardio_01]"
+4. **No Hallucinations:** Only recommend doctors listed above.
+5. **format:** Reply only with the medical advice or doctor recommendation. No additional text.
+6. **response length:** Keep it under 100 words.
+
+Response:
 `;
 
   const result = await model.generateContent(prompt);

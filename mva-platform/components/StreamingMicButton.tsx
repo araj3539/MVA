@@ -9,8 +9,8 @@ import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 
 type Props = {
-  addMessage: (text: string, sender: "user" | "ai") => void;
-  // New prop to handle live streaming text
+  // Update: Accept the optional recommendedDoctor argument
+  addMessage: (text: string, sender: "user" | "ai", recommendedDoctor?: any) => void;
   onPartial: (text: string) => void;
   setShowDoctorCTA: (v: boolean) => void;
 };
@@ -24,11 +24,9 @@ export default function StreamingMicButton({
   const { getToken } = useAuth();
 
   const { start, stop, isRecording } = useAssemblyAI(
-    // 1. FINAL TRANSCIPT HANDLER (Auto-Send triggers this)
+    // 1. FINAL TRANSCRIPT HANDLER
     async (finalText) => {
-      // Clear the partial text immediately
-      onPartial(""); 
-      
+      onPartial(""); // Clear the "ghost" text
       setTranscribing(true);
       addMessage(finalText, "user");
 
@@ -36,10 +34,15 @@ export default function StreamingMicButton({
         const token = await getToken();
         if (!token) throw new Error("No authentication token found");
 
+        // Call your backend
         const res = await sendTextToAI(finalText, token);
         const clean = cleanAIText(res.aiText);
 
-        addMessage(clean, "ai");
+        // --- NEW LOGIC: Handle Recommended Doctor ---
+        // Pass the 'recommendedDoctor' from the backend response to the chat
+        // (We cast 'res' to any in case your voiceApi types aren't updated yet)
+        addMessage(clean, "ai", (res as any).recommendedDoctor);
+        
         speakText(clean);
 
         if (res.escalate) setShowDoctorCTA(true);
@@ -52,7 +55,6 @@ export default function StreamingMicButton({
     },
     // 2. PARTIAL STREAMING HANDLER
     (partialText) => {
-      // Send the live text up to the parent to display
       onPartial(partialText);
     }
   );

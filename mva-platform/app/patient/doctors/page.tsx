@@ -22,14 +22,12 @@ type Message = {
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  // NEW: State to hold the text while you are speaking
   const [streamingText, setStreamingText] = useState(""); 
   const [showDoctorCTA, setShowDoctorCTA] = useState(false);
   const router = useRouter();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch doctors
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     fetch(`${apiUrl}/api/appointments/doctors`)
       .then((res) => {
@@ -41,7 +39,6 @@ export default function DoctorsPage() {
       })
       .catch((err) => console.error("Error loading doctors:", err));
     
-    // Initial greeting
     setMessages([{ 
       text: "Hello! I am your medical AI assistant. Describe your symptoms, and I can help you.", 
       sender: "ai",
@@ -49,7 +46,6 @@ export default function DoctorsPage() {
     }]);
   }, []);
 
-  // Auto-scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText]);
@@ -61,7 +57,7 @@ export default function DoctorsPage() {
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10">
       
-      {/* --- AI Section --- */}
+      {/* --- AI Chat Section --- */}
       <section className="flex flex-col items-center gap-8 p-8 bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden relative">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
         
@@ -72,7 +68,6 @@ export default function DoctorsPage() {
            <p className="text-gray-500">Powered by AssemblyAI & Gemini</p>
         </div>
         
-        {/* Chat Interface */}
         <div className="w-full max-w-3xl h-[400px] overflow-y-auto bg-gray-50 rounded-2xl p-6 shadow-inner border border-gray-200 flex flex-col gap-4">
           {messages.map((msg, i) => (
             <motion.div
@@ -98,7 +93,8 @@ export default function DoctorsPage() {
             </motion.div>
           ))}
 
-          {/* --- STREAMING BUBBLE (The "Ghost" Text) --- */}
+          {/* --- STREAMING GHOST BUBBLE --- */}
+          {/* This part creates the UI feature you asked for */}
           {streamingText && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -124,13 +120,12 @@ export default function DoctorsPage() {
         />
       </section>
 
-      {/* --- Doctor Recommendation (Pop-up) --- */}
+      {/* --- Doctor Recommendation Popup --- */}
       <AnimatePresence>
         {showDoctorCTA && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
             className="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-lg shadow-sm"
           >
             <div className="flex items-center gap-3">
@@ -138,7 +133,7 @@ export default function DoctorsPage() {
               <div>
                 <h3 className="font-bold text-amber-800">Medical Attention Recommended</h3>
                 <p className="text-amber-700 text-sm">
-                  Based on your symptoms, we suggest consulting a specialist. Please choose a doctor below.
+                  Based on your symptoms, we suggest consulting a specialist.
                 </p>
               </div>
             </div>
@@ -147,15 +142,8 @@ export default function DoctorsPage() {
       </AnimatePresence>
 
       <section>
-        <div className="flex items-center justify-between mb-6">
-           <h2 className="text-2xl font-bold text-gray-800">Available Doctors</h2>
-           <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-             {doctors.length} Specialists
-           </span>
-        </div>
-        
-        {doctors.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">Available Doctors</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {doctors.map((doc) => (
               <DoctorCard
                 key={doc._id}
@@ -163,12 +151,7 @@ export default function DoctorsPage() {
                 onBook={() => router.push(`/appointments/book?doctorId=${doc._id}`)}
               />
             ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-             <p>No doctors available at the moment.</p>
-          </div>
-        )}
+        </div>
       </section>
     </div>
   );
