@@ -13,10 +13,12 @@ type Doctor = {
   experience?: number;
 };
 
+// 1. UPDATE: Add recommendedDoctor to the Message type
 type Message = {
   text: string;
   sender: "user" | "ai";
   timestamp: Date;
+  recommendedDoctor?: Doctor; 
 };
 
 export default function DoctorsPage() {
@@ -50,8 +52,16 @@ export default function DoctorsPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText]);
 
-  const addMessage = (text: string, sender: "user" | "ai") => {
-    setMessages((prev) => [...prev, { text, sender, timestamp: new Date() }]);
+  // 2. UPDATE: Accept the recommendedDoctor argument
+  const addMessage = (text: string, sender: "user" | "ai", recommendedDoctor?: Doctor) => {
+    setMessages((prev) => [
+      ...prev, 
+      { text, sender, timestamp: new Date(), recommendedDoctor }
+    ]);
+  };
+
+  const handleCall = (doctorName: string) => {
+    alert(`Calling Dr. ${doctorName}...`); // Replace with real VOIP/Phone logic
   };
 
   return (
@@ -68,7 +78,7 @@ export default function DoctorsPage() {
            <p className="text-gray-500">Powered by AssemblyAI & Gemini</p>
         </div>
         
-        <div className="w-full max-w-3xl h-[400px] overflow-y-auto bg-gray-50 rounded-2xl p-6 shadow-inner border border-gray-200 flex flex-col gap-4">
+        <div className="w-full max-w-3xl h-[500px] overflow-y-auto bg-gray-50 rounded-2xl p-6 shadow-inner border border-gray-200 flex flex-col gap-4">
           {messages.map((msg, i) => (
             <motion.div
               key={i}
@@ -78,6 +88,7 @@ export default function DoctorsPage() {
                 msg.sender === "user" ? "self-end items-end" : "self-start items-start"
               }`}
             >
+              {/* Message Bubble */}
               <div
                 className={`px-5 py-3 rounded-2xl text-md leading-relaxed shadow-sm ${
                   msg.sender === "user"
@@ -87,14 +98,26 @@ export default function DoctorsPage() {
               >
                 {msg.text}
               </div>
+
+              {/* 3. UPDATE: Render DoctorCard if recommendation exists */}
+              {msg.recommendedDoctor && (
+                <div className="mt-3 w-full max-w-sm">
+                   <DoctorCard 
+                     doctor={msg.recommendedDoctor}
+                     isRecommendation={true}
+                     onBook={() => router.push(`/appointments/book?doctorId=${msg.recommendedDoctor?._id}`)}
+                     onCall={() => handleCall(msg.recommendedDoctor!.name)}
+                   />
+                </div>
+              )}
+
               <span className="text-[10px] text-gray-400 mt-1 px-1">
                 {msg.sender === "ai" ? "AI Assistant" : "You"} • {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </span>
             </motion.div>
           ))}
 
-          {/* --- STREAMING GHOST BUBBLE --- */}
-          {/* This part creates the UI feature you asked for */}
+          {/* Streaming Ghost Bubble */}
           {streamingText && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -120,7 +143,7 @@ export default function DoctorsPage() {
         />
       </section>
 
-      {/* --- Doctor Recommendation Popup --- */}
+      {/* --- Doctor Recommendation Popup (Optional: You can keep or remove this since the card is now in chat) --- */}
       <AnimatePresence>
         {showDoctorCTA && (
           <motion.div
