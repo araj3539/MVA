@@ -1,13 +1,30 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, unique: true },
-  password: String
-});
+  // Link to the Clerk User ID (essential for joining data)
+  clerkId: { 
+    type: String, 
+    required: true, 
+    unique: true 
+  },
+  
+  email: { 
+    type: String, 
+    required: true, 
+    unique: true 
+  },
+  
+  // Optional: Store role here if you want to query it easily in MongoDB
+  role: { 
+    type: String, 
+    enum: ["patient", "doctor", "admin"], 
+    default: "patient" 
+  },
 
-userSchema.pre("save", async function () {
-  this.password = await bcrypt.hash(this.password, 10);
+  createdAt: { 
+    type: Date, 
+    default: Date.now 
+  }
 });
 
 module.exports = mongoose.model("User", userSchema);

@@ -9,13 +9,14 @@ export function useAssemblyAI(
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   
-  // Buffers
-  const sessionTranscript = useRef("");
-  const currentTurnText = useRef("");
+  // 🔒 SIMPLIFIED BUFFER: Just keeps the latest "Truth" from the AI
+  const latestTextRef = useRef("");
+  const silenceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to Stop & Send
   const stop = () => {
-    // 1. Stop Audio
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+
+    // 1. Cleanup Audio & Socket
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -25,7 +26,6 @@ export function useAssemblyAI(
       audioContextRef.current = null;
     }
     
-    // 2. Close Socket
     if (socketRef.current) {
       if (socketRef.current.readyState === WebSocket.OPEN) {
           socketRef.current.send(JSON.stringify({ type: "Terminate" }));
@@ -36,27 +36,28 @@ export function useAssemblyAI(
     
     setIsRecording(false);
 
-    // 3. Finalize Text & Send
-    const finalText = (sessionTranscript.current + " " + currentTurnText.current).trim();
+    // 2. SEND FINAL TEXT
+    // We simply send whatever the latest valid text was. No appending/duplicating.
+    const finalText = latestTextRef.current.trim();
     if (finalText) {
       onFinalTranscript(finalText);
     }
 
-    // 4. Reset
-    sessionTranscript.current = "";
-    currentTurnText.current = "";
+    // 3. Reset
+    latestTextRef.current = "";
   };
 
   const start = async () => {
     try {
+      // Clear buffer on start
+      latestTextRef.current = "";
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       const tokenRes = await fetch(`${apiUrl}/api/assembly/token`);
-      
       if (!tokenRes.ok) throw new Error("Failed to fetch AssemblyAI token");
-      
       const { token } = await tokenRes.json();
 
-      // Connect to EU Endpoint
+      // V3 EU Endpoint
       const socket = new WebSocket(
         `wss://streaming.eu.assemblyai.com/v3/ws?sample_rate=16000&token=${token}`
       );
@@ -64,21 +65,31 @@ export function useAssemblyAI(
 
       socket.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
+        const text = data.transcript || data.text || ""; 
 
-        if (data.type === 'Turn') {
-           // FIX: Overwrite text to prevent "i i have i have" stuttering
-           if (data.transcript) {
-             currentTurnText.current = data.transcript;
-           }
+        // Ignore empty updates
+        if (!text) return;
 
-           // Update the "Ghost Bubble" in UI
-           const fullDisplay = (sessionTranscript.current + " " + currentTurnText.current).trim();
-           onPartial?.(fullDisplay);
+        // 🛑 CORE FIX: Always update the "Latest Truth"
+        // We don't append. We assume the AI gives us the best current transcription.
+        latestTextRef.current = text;
+        onPartial?.(text);
 
-           // Auto-Send on Silence
-           if (data.end_of_turn) {
-             stop(); 
-           }
+        // Silence Detection (1.5s)
+        if (silenceTimer.current) clearTimeout(silenceTimer.current);
+        
+        // If it's a "Final" event, we might want to stop sooner, 
+        // but for safety, we rely on the Silence Timer to trigger the send.
+        if (data.type === 'FinalTranscript' || data.type === 'Turn') {
+             silenceTimer.current = setTimeout(() => {
+               console.log("🛑 Silence detected, sending...");
+               stop(); 
+             }, 1500);
+        } else {
+             // For partials, also set a timer (in case user just stops talking without a Final event)
+             silenceTimer.current = setTimeout(() => {
+               stop();
+             }, 2500); // Slightly longer timeout for partials
         }
       };
 
@@ -86,22 +97,22 @@ export function useAssemblyAI(
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const audioContext = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = audioContext;
-
         const source = audioContext.createMediaStreamSource(stream);
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
         processorRef.current = processor;
-
         source.connect(processor);
         processor.connect(audioContext.destination);
-
         processor.onaudioprocess = (e) => {
-          const input = e.inputBuffer.getChannelData(0);
-          const pcm16 = convertFloat32ToInt16(input);
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(pcm16);
-          }
+            if (socket.readyState === WebSocket.OPEN) {
+                const input = e.inputBuffer.getChannelData(0);
+                const pcm16 = new Int16Array(input.length);
+                for (let i = 0; i < input.length; i++) {
+                    const s = Math.max(-1, Math.min(1, input[i]));
+                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                socket.send(pcm16);
+            }
         };
-        
         setIsRecording(true);
       };
 
@@ -112,21 +123,9 @@ export function useAssemblyAI(
 
     } catch (err) {
       console.error(err);
-      alert("Microphone error or backend connection failed.");
       setIsRecording(false);
     }
   };
 
   return { start, stop, isRecording };
-}
-
-function convertFloat32ToInt16(buffer: Float32Array) {
-  const pcm = new ArrayBuffer(buffer.length * 2);
-  const view = new DataView(pcm);
-  let offset = 0;
-  for (let i = 0; i < buffer.length; i++, offset += 2) {
-    let s = Math.max(-1, Math.min(1, buffer[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return pcm;
 }

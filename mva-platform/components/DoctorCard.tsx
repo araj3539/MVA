@@ -12,8 +12,8 @@ type Doctor = {
 type Props = {
   doctor: Doctor;
   onBook: () => void;
-  onCall?: () => void; // New prop for Calling
-  isRecommendation?: boolean; // Style differently if recommended
+  onCall?: () => void;
+  isRecommendation?: boolean;
 };
 
 export default function DoctorCard({ doctor, onBook, onCall, isRecommendation }: Props) {
@@ -23,53 +23,57 @@ export default function DoctorCard({ doctor, onBook, onCall, isRecommendation }:
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -5 }}
       className={`
-        relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-all
+        relative overflow-hidden rounded-2xl p-6 transition-all duration-300
         ${isRecommendation 
-          ? "bg-gradient-to-br from-green-50 to-emerald-50 border-emerald-200 shadow-md" 
-          : "bg-white border-gray-100 hover:shadow-md"}
+          ? "bg-white/80 backdrop-blur-xl border-2 border-emerald-400/30 shadow-xl shadow-emerald-500/10" 
+          : "glass hover:border-sky-200/60 hover:shadow-xl hover:shadow-sky-500/10"}
       `}
     >
       {/* "Recommended" Badge */}
       {isRecommendation && (
-        <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
-          BEST MATCH
+        <div className="absolute top-0 right-0 bg-gradient-to-bl from-emerald-500 to-teal-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl shadow-sm z-10">
+          TOP MATCH
         </div>
       )}
 
-      <div className="flex items-start gap-4">
-        {/* Avatar Placeholder */}
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold
-          ${isRecommendation ? "bg-emerald-100 text-emerald-600" : "bg-blue-50 text-blue-600"}`}>
+      <div className="flex items-center gap-5 mb-5">
+        {/* Avatar */}
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-inner
+          ${isRecommendation ? "bg-emerald-100 text-emerald-600" : "bg-sky-50 text-sky-600"}`}>
           {doctor.name.charAt(4)}
         </div>
         
         <div className="flex-1">
-          <h3 className="font-bold text-gray-900">{doctor.name}</h3>
-          <p className="text-sm text-blue-600 font-medium">{doctor.specialization}</p>
-          <p className="text-xs text-gray-500 mt-1">{doctor.experience}+ Years Experience</p>
+          <h3 className="font-serif font-bold text-lg text-slate-900 leading-tight">{doctor.name}</h3>
+          <p className="text-sm text-sky-600 font-semibold mb-1">{doctor.specialization}</p>
+          <div className="flex items-center gap-1 text-xs text-slate-400 font-medium">
+            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+            {doctor.experience || 5}+ Years Experience
+          </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-2 mt-4">
+      <div className="grid grid-cols-2 gap-3">
         {onCall && (
            <button 
              onClick={onCall}
-             className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 rounded-xl flex items-center justify-center gap-2 animate-pulse"
+             className="col-span-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all
+               bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white hover:shadow-lg hover:shadow-emerald-500/20"
            >
-             <span>📞</span> Call Now
+             <span>📞</span> Call
            </button>
         )}
         
         <button
           onClick={onBook}
-          className={`flex-1 text-sm font-semibold py-2 rounded-xl border
+          className={`col-span-1 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm
             ${isRecommendation 
-              ? "bg-white border-green-200 text-green-700 hover:bg-green-50" 
-              : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"}
+              ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/30" 
+              : "bg-slate-900 text-white hover:bg-sky-600 hover:shadow-sky-500/30"}
           `}
         >
-          Book Visit
+          Book
         </button>
       </div>
     </motion.div>

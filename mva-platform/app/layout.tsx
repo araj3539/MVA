@@ -1,56 +1,37 @@
-import {
-  ClerkProvider,
-  SignInButton,
-  SignedIn,
-  SignedOut,
-  UserButton
-} from "@clerk/nextjs";
 import type { Metadata } from "next";
 import "./globals.css";
-import Link from "next/link";
+import { ClerkProvider } from "@clerk/nextjs";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "AI Medical Voice Platform",
-  description: "AI-powered medical assistant",
+  title: "MVA Health | AI Medical Assistant",
+  description: "Your health, spoken. AI-powered healthcare platform.",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <ClerkProvider>
       <html lang="en">
-        <body>
-          {/* Global Header */}
-          <header className="flex items-center justify-between p-4 border-b bg-white shadow-sm">
-            <Link href="/" className="text-xl font-bold text-blue-600">
-              MVA Platform
-            </Link>
+        <body className="bg-slate-50 min-h-screen font-sans">
+          
+          {/* Animated Background Mesh */}
+          <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+             <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-sky-200/40 rounded-full blur-[100px] mix-blend-multiply animate-blob"></div>
+             <div className="absolute top-[20%] left-[-10%] w-[400px] h-[400px] bg-teal-200/40 rounded-full blur-[100px] mix-blend-multiply animate-blob animation-delay-2000"></div>
+             <div className="absolute bottom-[-20%] left-[20%] w-[600px] h-[600px] bg-indigo-200/40 rounded-full blur-[100px] mix-blend-multiply animate-blob animation-delay-4000"></div>
+          </div>
 
-            <div>
-              {/* Show this only when user is logged OUT */}
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Sign In
-                  </button>
-                </SignInButton>
-              </SignedOut>
+          <Navbar /> 
 
-              {/* Show this only when user is logged IN */}
-              <SignedIn>
-                {/* UserButton contains the "Sign Out" option automatically */}
-                <UserButton showName />
-              </SignedIn>
-            </div>
-          </header>
-
-          {/* Main Page Content */}
-          <main className="p-4">
+          <main className="relative z-10">
             {children}
           </main>
+          <Footer />
         </body>
       </html>
     </ClerkProvider>

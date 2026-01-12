@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useAssemblyAI } from "@/lib/useAssemblyAI";
 import { cleanAIText } from "@/lib/cleanText";
 import { useAuth } from "@clerk/nextjs";
+import { sendTextToAI } from "@/lib/voiceApi"; // <--- Import the new function
 
 type Doctor = {
   _id: string;
@@ -18,113 +19,93 @@ type Props = {
 };
 
 export default function CallOverlay({ doctor, onEndCall }: Props) {
-  const [transcript, setTranscript] = useState<
-    { sender: "user" | "doctor"; text: string }[]
-  >([]);
+  const [transcript, setTranscript] = useState<{ sender: "user" | "doctor"; text: string }[]>([]);
   const [isMuted, setIsMuted] = useState(false);
-  const [aiSpeaking, setAiSpeaking] = useState(false); // Visual state
+  const [aiSpeaking, setAiSpeaking] = useState(false);
 
-  // Ref to track speaking state instantly without re-render lag
   const isAiSpeakingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { getToken } = useAuth();
 
-  // --- Helper: Speak with State Management ---
+  // --- Helper: Speak with State Management (Same as before) ---
   const speakWithState = (text: string) => {
     if (typeof window === "undefined") return;
-
-    // Cancel any current speech
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
-
-    // 1. Lock Mic when AI starts
+    
     utterance.onstart = () => {
       isAiSpeakingRef.current = true;
       setAiSpeaking(true);
     };
-
-    // 2. Unlock Mic when AI ends
     utterance.onend = () => {
       isAiSpeakingRef.current = false;
       setAiSpeaking(false);
     };
-
-    // Error safety: Unlock if speech fails
     utterance.onerror = () => {
-      isAiSpeakingRef.current = false;
-      setAiSpeaking(false);
+        isAiSpeakingRef.current = false;
+        setAiSpeaking(false);
     };
-
     window.speechSynthesis.speak(utterance);
   };
 
   const { start, stop, isRecording } = useAssemblyAI(
     async (text) => {
-      // --- CRITICAL FIX: Ignore input if AI is currently talking ---
+      // 1. Client-side Check: If AI is talking, ignore input locally immediately
       if (isAiSpeakingRef.current) {
-        console.log("Ignored echo:", text);
+        console.log("Client-side Echo Blocked:", text);
         return;
       }
 
-      // 1. User speaks -> Show in transcript
+      // Add user text to UI temporarily (optimistic update)
       addTranscript("user", text);
 
       try {
         const token = await getToken();
         if (!token) return;
 
-        // 2. Send to Backend
-        const res = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-          }/api/voice`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              text,
-              isCallMode: true,
-              doctorId: doctor._id,
-            }),
-          }
+        // 2. Server-side Check: Send to AI with Context
+        const data = await sendTextToAI(
+            { 
+                text, 
+                isCallMode: true, 
+                doctorId: doctor._id 
+            }, 
+            token
         );
 
-        const data = await res.json();
+        // 3. Handle Echo/Ignored Response
+        if (data.ignored) {
+            console.log("Server-side Echo Blocked (Similarity Check)");
+            // Optional: Remove the last user message if it was actually an echo
+            setTranscript(prev => prev.slice(0, -1)); 
+            return;
+        }
+
         const aiResponse = cleanAIText(data.aiText);
 
-        // 3. AI responds
+        // 4. Update UI and Speak
         addTranscript("doctor", aiResponse);
-
-        // 4. Speak response (locks mic internally)
         speakWithState(aiResponse);
+
       } catch (err) {
         console.error("Call Error", err);
       }
     },
-    () => {} // Partial results ignored for simplicity
+    () => {} 
   );
 
-  // Auto-start call on mount
+  // ... (Rest of lifecycle hooks and UI code remains the same)
   useEffect(() => {
     start();
-    // Delay the greeting slightly to ensure mic is ready, but lock immediately
     setTimeout(() => {
-      speakWithState(
-        `Hello, I am Dr. ${doctor.name.split(" ")[1]}. How can I help you?`
-      );
+      speakWithState(`Hello, I am Dr. ${doctor.name.split(" ")[1]}. How can I help you?`);
     }, 500);
-
     return () => {
       stop();
-      window.speechSynthesis.cancel(); // Stop talking on close
+      window.speechSynthesis.cancel();
     };
   }, []);
 
-  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

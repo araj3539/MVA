@@ -1,8 +1,11 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const appointmentSchema = new mongoose.Schema({
-  patientId: String,       // Clerk userId
-  doctorId: mongoose.Schema.Types.ObjectId,
+  patientId: String,       // Clerk userId (String)
+  doctorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Doctor"
+  },
   date: String,
   time: String,
   status: {
@@ -16,4 +19,4 @@ const appointmentSchema = new mongoose.Schema({
   }
 });
 
-export default mongoose.model("Appointment", appointmentSchema);
+module.exports = mongoose.model("Appointment", appointmentSchema);

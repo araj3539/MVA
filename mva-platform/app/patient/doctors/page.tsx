@@ -5,7 +5,8 @@ import DoctorCard from "@/components/DoctorCard";
 import { useRouter } from "next/navigation";
 import StreamingMicButton from "@/components/StreamingMicButton";
 import { motion, AnimatePresence } from "framer-motion";
-import CallOverlay from "@/components/CallOverlay"; // <--- IMPORT THIS
+import CallOverlay from "@/components/CallOverlay";
+import { Sparkles } from "lucide-react";
 
 type Doctor = {
   _id: string;
@@ -26,8 +27,6 @@ export default function DoctorsPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingText, setStreamingText] = useState(""); 
   const [showDoctorCTA, setShowDoctorCTA] = useState(false);
-  
-  // --- NEW STATE for Call Feature ---
   const [activeCallDoctor, setActiveCallDoctor] = useState<Doctor | null>(null);
 
   const router = useRouter();
@@ -46,7 +45,7 @@ export default function DoctorsPage() {
       .catch((err) => console.error("Error loading doctors:", err));
     
     setMessages([{ 
-      text: "Hello! I am your medical AI assistant. Describe your symptoms, and I can help you.", 
+      text: "Hello! I'm your medical AI assistant. Describe your symptoms, and I can help find the right specialist for you.", 
       sender: "ai",
       timestamp: new Date()
     }]);
@@ -63,133 +62,157 @@ export default function DoctorsPage() {
     ]);
   };
 
-  // --- UPDATED HANDLER ---
   const handleCall = (doctorName: string, fullDoctor?: Doctor) => {
-    // If we have the full doctor object, start the call overlay
-    if (fullDoctor) {
-      setActiveCallDoctor(fullDoctor);
-    } else {
-      // Fallback if passing just name (legacy)
+    if (fullDoctor) setActiveCallDoctor(fullDoctor);
+    else {
       const found = doctors.find(d => d.name === doctorName);
       if (found) setActiveCallDoctor(found);
-      else alert("Connecting to secure line...");
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 relative">
+    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-12">
       
-      {/* --- AI Chat Section --- */}
-      <section className="flex flex-col items-center gap-8 p-8 bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+      {/* --- Page Header --- */}
+      <div className="text-center space-y-4 py-4">
+        <h1 className="text-4xl md:text-5xl font-serif font-bold text-slate-900">
+          Find Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-teal-500">Specialist</span>
+        </h1>
+        <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+          Connect with top-rated doctors instantly using our AI-powered matching system.
+        </p>
+      </div>
+
+      <div className="grid lg:grid-cols-12 gap-8 items-start">
         
-        <div className="text-center space-y-2">
-           <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
-             AI Health Assistant
-           </h1>
-           <p className="text-gray-500">Powered by AssemblyAI & Gemini</p>
-        </div>
-        
-        <div className="w-full max-w-3xl h-[500px] overflow-y-auto bg-gray-50 rounded-2xl p-6 shadow-inner border border-gray-200 flex flex-col gap-4">
-          {messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className={`flex flex-col max-w-[80%] ${
-                msg.sender === "user" ? "self-end items-end" : "self-start items-start"
-              }`}
-            >
-              <div
-                className={`px-5 py-3 rounded-2xl text-md leading-relaxed shadow-sm ${
-                  msg.sender === "user"
-                    ? "bg-blue-600 text-white rounded-br-none"
-                    : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
-                }`}
-              >
-                {msg.text}
-              </div>
-
-              {/* Doctor Recommendation in Chat */}
-              {msg.recommendedDoctor && (
-                <div className="mt-3 w-full max-w-sm">
-                   <DoctorCard 
-                     doctor={msg.recommendedDoctor}
-                     isRecommendation={true}
-                     onBook={() => router.push(`/appointments/book?doctorId=${msg.recommendedDoctor?._id}`)}
-                     // Pass full doctor object to handleCall
-                     onCall={() => handleCall(msg.recommendedDoctor!.name, msg.recommendedDoctor)}
-                   />
-                </div>
-              )}
-
-              <span className="text-[10px] text-gray-400 mt-1 px-1">
-                {msg.sender === "ai" ? "AI Assistant" : "You"} • {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-              </span>
-            </motion.div>
-          ))}
-
-          {streamingText && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col max-w-[80%] self-end items-end"
-            >
-              <div className="px-5 py-3 rounded-2xl rounded-br-none bg-blue-100 text-blue-800 border border-blue-200 shadow-sm animate-pulse">
-                {streamingText}
-                <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-blink align-middle" />
-              </div>
-              <span className="text-[10px] text-blue-400 mt-1 px-1">Listening...</span>
-            </motion.div>
-          )}
+        {/* --- LEFT: AI Chat Section (Takes 7 cols on large screens) --- */}
+        <section className="lg:col-span-7 glass rounded-[2.5rem] p-1 shadow-2xl shadow-sky-900/5 relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-sky-400 via-indigo-400 to-teal-400" />
           
-          <div ref={chatEndRef} />
-        </div>
+          <div className="bg-white/50 backdrop-blur-sm rounded-[2.2rem] p-6 md:p-8 h-[600px] flex flex-col relative">
+            
+            {/* Chat Header */}
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-800 text-lg">AI Health Assistant</h2>
+                <p className="text-xs text-slate-500 font-medium">Powered by AssemblyAI</p>
+              </div>
+            </div>
 
-        <StreamingMicButton 
-          addMessage={addMessage} 
-          onPartial={(text) => setStreamingText(text)} 
-          setShowDoctorCTA={setShowDoctorCTA} 
-        />
-      </section>
+            {/* Chat Messages Area */}
+            <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+              {messages.map((msg, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className={`flex flex-col max-w-[85%] ${
+                    msg.sender === "user" ? "self-end items-end" : "self-start items-start"
+                  }`}
+                >
+                  <div
+                    className={`px-6 py-4 rounded-2xl text-[15px] leading-relaxed shadow-sm backdrop-blur-sm ${
+                      msg.sender === "user"
+                        ? "bg-slate-900 text-white rounded-br-none shadow-slate-500/20"
+                        : "bg-white text-slate-700 border border-slate-200/60 rounded-bl-none shadow-sm"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
 
-      {/* --- Doctor Recommendation Popup --- */}
+                  {msg.recommendedDoctor && (
+                    <div className="mt-4 w-full max-w-sm">
+                       <DoctorCard 
+                         doctor={msg.recommendedDoctor}
+                         isRecommendation={true}
+                         onBook={() => router.push(`/appointments/book?doctorId=${msg.recommendedDoctor?._id}`)}
+                         onCall={() => handleCall(msg.recommendedDoctor!.name, msg.recommendedDoctor)}
+                       />
+                    </div>
+                  )}
+
+                  <span className="text-[10px] text-slate-400 mt-2 px-1 font-medium">
+                    {msg.sender === "ai" ? "AI Assistant" : "You"} • {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </span>
+                </motion.div>
+              ))}
+
+              {streamingText && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col max-w-[80%] self-end items-end"
+                >
+                  <div className="px-6 py-4 rounded-2xl rounded-br-none bg-sky-50 text-sky-800 border border-sky-100 shadow-inner">
+                    <span className="animate-pulse">{streamingText}</span>
+                    <span className="inline-block w-1.5 h-4 ml-1 bg-sky-500 animate-blink align-middle" />
+                  </div>
+                  <span className="text-[10px] text-sky-400 mt-1 px-1 font-bold">Listening...</span>
+                </motion.div>
+              )}
+              
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Mic Button Area */}
+            <div className="mt-4 pt-4 border-t border-slate-100 flex justify-center">
+               <StreamingMicButton 
+                 addMessage={addMessage} 
+                 onPartial={(text) => setStreamingText(text)} 
+                 setShowDoctorCTA={setShowDoctorCTA} 
+               />
+            </div>
+          </div>
+        </section>
+
+        {/* --- RIGHT: Doctor Grid (Takes 5 cols) --- */}
+        <section className="lg:col-span-5 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <span className="w-2 h-6 bg-sky-500 rounded-full"></span>
+              Available Doctors
+            </h3>
+            <span className="text-xs font-bold text-sky-600 bg-sky-50 px-3 py-1 rounded-full border border-sky-100">
+              {doctors.length} Online
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4 max-h-[800px] overflow-y-auto pr-2 pb-10">
+              {doctors.map((doc) => (
+                <DoctorCard
+                  key={doc._id}
+                  doctor={doc}
+                  onBook={() => router.push(`/appointments/book?doctorId=${doc._id}`)}
+                  onCall={() => handleCall(doc.name, doc)}
+                />
+              ))}
+          </div>
+        </section>
+
+      </div>
+
+      {/* --- Alert Popup --- */}
       <AnimatePresence>
         {showDoctorCTA && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-lg shadow-sm"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-white/90 backdrop-blur-xl border border-amber-200 p-4 rounded-2xl shadow-2xl shadow-amber-500/20 flex items-center gap-4 max-w-md w-full mx-4"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div>
-                <h3 className="font-bold text-amber-800">Medical Attention Recommended</h3>
-                <p className="text-amber-700 text-sm">
-                  Based on your symptoms, we suggest consulting a specialist.
-                </p>
-              </div>
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-xl">⚠️</div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Action Required</h3>
+              <p className="text-slate-500 text-xs">Based on your symptoms, please consult a specialist immediately.</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <section>
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Available Doctors</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {doctors.map((doc) => (
-              <DoctorCard
-                key={doc._id}
-                doctor={doc}
-                onBook={() => router.push(`/appointments/book?doctorId=${doc._id}`)}
-                // Also enable calling from the main grid
-                onCall={() => handleCall(doc.name, doc)}
-              />
-            ))}
-        </div>
-      </section>
-
-      {/* --- NEW: Floating Call Overlay --- */}
+      {/* --- Call Overlay --- */}
       <AnimatePresence>
         {activeCallDoctor && (
            <CallOverlay 
