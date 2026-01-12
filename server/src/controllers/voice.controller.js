@@ -1,7 +1,10 @@
 const { checkEmergency } = require("../services/safety.service");
-const { generateResponse } = require("../services/gemini.service");
+const {
+  generateAIResponse: generateResponse,
+} = require("../services/ai.router");
 const Conversation = require("../models/Conversation");
 const Doctor = require("../models/Doctor");
+const { generateDoctorCallResponse } = require("../services/ai.router");
 
 // Track last processed text per user (simple debounce)
 const lastUserTextMap = new Map();
@@ -35,7 +38,9 @@ exports.handleText = async (req, res) => {
     lastUserTextMap.set(userId, cleanText);
 
     // --- 1. ECHO CANCELLATION ---
-    const lastMsg = await Conversation.findOne({ userId }).sort({ timestamp: -1 });
+    const lastMsg = await Conversation.findOne({ userId }).sort({
+      timestamp: -1,
+    });
     if (lastMsg && isEcho(cleanText, lastMsg.aiText)) {
       console.log("🚫 Echo detected.");
       return res.json({ aiText: "", ignored: true });
@@ -46,13 +51,17 @@ exports.handleText = async (req, res) => {
       const emergencyMsg =
         "🚨 This sounds like a medical emergency. Please hang up and call 911 immediately.";
       if (userId !== "guest") {
-        await Conversation.create({
-          userId,
-          userText: cleanText,
-          aiText: emergencyMsg,
-          escalated: true,
-          doctorId: doctorId || null,
-        });
+        if (aiText && aiText.trim()) {
+  await Conversation.create({
+    userId,
+    userText: text,
+    aiText,
+    doctorId: doctorId || null,
+  });
+} else {
+  console.warn("⚠️ Skipping save: empty aiText");
+}
+
       }
       return res.json({ aiText: emergencyMsg, escalate: true });
     }
@@ -80,9 +89,32 @@ exports.handleText = async (req, res) => {
         .map((h) => `Patient: "${h.userText}"\nDoctor: "${h.aiText}"`)
         .join("\n");
 
-      const doctorSystemInstruction = `
-You are ${doctorName}, a senior ${specialization} with 20 years of experience.
-Act like a real doctor. Be decisive, short, and confident.
+      const doctorSystemInstruction = `You are a real human doctor speaking on a phone call.
+
+ROLE:
+- Act like a calm, experienced doctor.
+- Speak naturally, like a conversation, not a report.
+
+RULES:
+1. DO NOT repeat greetings if the call has already started.
+2. DO NOT list many questions at once.
+3. Ask at most ONE short follow-up question per response.
+4. Do NOT use medical disclaimers or policy language.
+5. Do NOT say “to proceed” or “please confirm”.
+6. Avoid bullet points, lists, or long explanations.
+7. Keep responses under 2–3 sentences unless absolutely necessary.
+
+STYLE:
+- Natural, empathetic, conversational.
+- Short pauses implied, like real speech.
+
+GOAL:
+- Gradually understand symptoms.
+- Give simple advice.
+- Sound human.
+
+You are already on the call. Continue naturally.
+Do not restart the conversation. Continue from the current point.
 `;
 
       const prompt = `
@@ -93,15 +125,27 @@ PATIENT JUST SAID:
 "${cleanText}"
 `;
 
-      aiText = await generateResponse(prompt, doctorSystemInstruction);
+      aiText = await generateDoctorCallResponse(
+        prompt,
+        doctorSystemInstruction
+      );
 
       if (userId !== "guest") {
-        await Conversation.create({ userId, userText: cleanText, aiText, doctorId });
+        if (aiText && aiText.trim()) {
+          await Conversation.create({
+            userId,
+            userText: text,
+            aiText,
+            doctorId: doctorId || null,
+          });
+        } else {
+          console.warn("⚠️ Skipping save: empty aiText");
+        }
       }
 
-    // ============================================================
-    // MODE B: GENERAL ASSISTANT
-    // ============================================================
+      // ============================================================
+      // MODE B: GENERAL ASSISTANT
+      // ============================================================
     } else {
       const historyDocs = await Conversation.find({ userId, doctorId: null })
         .sort({ timestamp: -1 })
@@ -119,9 +163,11 @@ PATIENT JUST SAID:
         .join("\n");
 
       const assistantSystemInstruction = `
-You are a medical assistant.
-Explain briefly and recommend a specialist.
-Keep under 40 words.
+You are the MVA Medical Assistant.
+        - Analyze symptoms and provide brief guidance.
+        - Recommend a doctor from the list if symptoms match.
+        - Format: [REC:DOCTOR_ID] if recommending.
+        - Keep it under 80 words.
 `;
 
       const prompt = `
@@ -144,18 +190,21 @@ USER SAID:
       }
 
       if (userId !== "guest") {
-        await Conversation.create({
-          userId,
-          userText: cleanText,
-          aiText,
-          escalated: !!recommendedDoctor,
-          doctorId: null,
-        });
+        if (aiText && aiText.trim()) {
+  await Conversation.create({
+    userId,
+    userText: text,
+    aiText,
+    doctorId: doctorId || null,
+  });
+} else {
+  console.warn("⚠️ Skipping save: empty aiText");
+}
+
       }
     }
 
     return res.json({ aiText, recommendedDoctor });
-
   } catch (err) {
     console.error("🔥 Controller Error:", err);
     return res.status(500).json({ error: "Processing failed" });
