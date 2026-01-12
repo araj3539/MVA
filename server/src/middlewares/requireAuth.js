@@ -1,24 +1,8 @@
-const { clerkClient } = require("@clerk/clerk-sdk-node");
+const { ClerkExpressRequireAuth } = require("@clerk/clerk-sdk-node");
 
-exports.requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Missing auth token" });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-
-    const session = await clerkClient.verifyToken(token);
-
-    req.auth = {
-      userId: session.sub,
-    };
-
-    next();
-  } catch (err) {
-    console.error("Auth error:", err.message);
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-};
+// This middleware automatically:
+// 1. Checks for the Bearer token
+// 2. Verifies the signature using your CLERK_SECRET_KEY
+// 3. Populates 'req.auth' with { userId, sessionId, etc. }
+// 4. Returns 401 Unauthorized if the token is missing or invalid
+exports.requireAuth = ClerkExpressRequireAuth();

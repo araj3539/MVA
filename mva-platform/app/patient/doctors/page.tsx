@@ -5,6 +5,7 @@ import DoctorCard from "@/components/DoctorCard";
 import { useRouter } from "next/navigation";
 import StreamingMicButton from "@/components/StreamingMicButton";
 import { motion, AnimatePresence } from "framer-motion";
+import CallOverlay from "@/components/CallOverlay"; // <--- IMPORT THIS
 
 type Doctor = {
   _id: string;
@@ -13,7 +14,6 @@ type Doctor = {
   experience?: number;
 };
 
-// 1. UPDATE: Add recommendedDoctor to the Message type
 type Message = {
   text: string;
   sender: "user" | "ai";
@@ -26,6 +26,10 @@ export default function DoctorsPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingText, setStreamingText] = useState(""); 
   const [showDoctorCTA, setShowDoctorCTA] = useState(false);
+  
+  // --- NEW STATE for Call Feature ---
+  const [activeCallDoctor, setActiveCallDoctor] = useState<Doctor | null>(null);
+
   const router = useRouter();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +56,6 @@ export default function DoctorsPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText]);
 
-  // 2. UPDATE: Accept the recommendedDoctor argument
   const addMessage = (text: string, sender: "user" | "ai", recommendedDoctor?: Doctor) => {
     setMessages((prev) => [
       ...prev, 
@@ -60,12 +63,21 @@ export default function DoctorsPage() {
     ]);
   };
 
-  const handleCall = (doctorName: string) => {
-    alert(`Calling Dr. ${doctorName}...`); // Replace with real VOIP/Phone logic
+  // --- UPDATED HANDLER ---
+  const handleCall = (doctorName: string, fullDoctor?: Doctor) => {
+    // If we have the full doctor object, start the call overlay
+    if (fullDoctor) {
+      setActiveCallDoctor(fullDoctor);
+    } else {
+      // Fallback if passing just name (legacy)
+      const found = doctors.find(d => d.name === doctorName);
+      if (found) setActiveCallDoctor(found);
+      else alert("Connecting to secure line...");
+    }
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10">
+    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 relative">
       
       {/* --- AI Chat Section --- */}
       <section className="flex flex-col items-center gap-8 p-8 bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden relative">
@@ -88,7 +100,6 @@ export default function DoctorsPage() {
                 msg.sender === "user" ? "self-end items-end" : "self-start items-start"
               }`}
             >
-              {/* Message Bubble */}
               <div
                 className={`px-5 py-3 rounded-2xl text-md leading-relaxed shadow-sm ${
                   msg.sender === "user"
@@ -99,14 +110,15 @@ export default function DoctorsPage() {
                 {msg.text}
               </div>
 
-              {/* 3. UPDATE: Render DoctorCard if recommendation exists */}
+              {/* Doctor Recommendation in Chat */}
               {msg.recommendedDoctor && (
                 <div className="mt-3 w-full max-w-sm">
                    <DoctorCard 
                      doctor={msg.recommendedDoctor}
                      isRecommendation={true}
                      onBook={() => router.push(`/appointments/book?doctorId=${msg.recommendedDoctor?._id}`)}
-                     onCall={() => handleCall(msg.recommendedDoctor!.name)}
+                     // Pass full doctor object to handleCall
+                     onCall={() => handleCall(msg.recommendedDoctor!.name, msg.recommendedDoctor)}
                    />
                 </div>
               )}
@@ -117,7 +129,6 @@ export default function DoctorsPage() {
             </motion.div>
           ))}
 
-          {/* Streaming Ghost Bubble */}
           {streamingText && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -135,7 +146,6 @@ export default function DoctorsPage() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Mic Control */}
         <StreamingMicButton 
           addMessage={addMessage} 
           onPartial={(text) => setStreamingText(text)} 
@@ -143,7 +153,7 @@ export default function DoctorsPage() {
         />
       </section>
 
-      {/* --- Doctor Recommendation Popup (Optional: You can keep or remove this since the card is now in chat) --- */}
+      {/* --- Doctor Recommendation Popup --- */}
       <AnimatePresence>
         {showDoctorCTA && (
           <motion.div
@@ -172,10 +182,23 @@ export default function DoctorsPage() {
                 key={doc._id}
                 doctor={doc}
                 onBook={() => router.push(`/appointments/book?doctorId=${doc._id}`)}
+                // Also enable calling from the main grid
+                onCall={() => handleCall(doc.name, doc)}
               />
             ))}
         </div>
       </section>
+
+      {/* --- NEW: Floating Call Overlay --- */}
+      <AnimatePresence>
+        {activeCallDoctor && (
+           <CallOverlay 
+             doctor={activeCallDoctor}
+             onEndCall={() => setActiveCallDoctor(null)}
+           />
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

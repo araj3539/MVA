@@ -1,4 +1,5 @@
 const express = require("express");
+const { requireAuth } = require("../middlewares/requireAuth"); // Import Middleware
 const {
   addSlot,
   getMySlots,
@@ -7,8 +8,11 @@ const {
 
 const router = express.Router();
 
-router.post("/slot", addSlot);
-router.get("/slots/:doctorId", getMySlots);
-router.get("/appointments/:doctorId", getDoctorAppointments);
+// 🔒 Protect this route with requireAuth
+router.post("/slot", requireAuth, addSlot);
+
+// You might want to protect these too, or leave them public if patients need to see slots
+router.get("/slots/:doctorId", getMySlots); 
+router.get("/appointments/:doctorId", requireAuth, getDoctorAppointments);
 
 module.exports = router;
